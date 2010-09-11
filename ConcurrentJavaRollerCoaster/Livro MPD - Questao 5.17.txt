@@ -1,0 +1,134 @@
+Livro Multithreaded, Parallel, and Distributed Programming - Questão 5.17
+Solução:
+
+a)
+Invariant: (pc <= cc and cr => (pc == cc))
+	- pc: number of passengers in the car
+	- cc: number of passengers the car can carry
+	- cr: true if the car is riding, false otherwise
+	
+monitor RollerCoasterOneCar {
+
+	int CAR_CAPACITY; # Predefined
+	int passengersInCar = 0; # Number of passengers in the car 
+	int carIsWaitingPassengers = 0; # 1 if the car is waiting for passengers; 0 otherwise
+	
+	cond carLoad; # Signaled when the car can load passengers
+	cond carUnload; # Signaled when the car is unloading its passengers
+	cond carIsFull; # Signaled when the car is full
+	
+	procedure takeRide() {
+		# Waits the car become available:
+		while (carIsWaitingPassengers == 0 || passengersInCar == CAR_CAPACITY) {
+			# Waiting for the car
+			wait(carLoad);
+		}
+		
+		passengersInCar++;
+		# This passenger will take ride in the car
+		if (passengersInCar == CAR_CAPACITY) {
+			# Notifies the car that it is full:
+			signal(carIsFull);
+		}		
+		# Waits until the car gets full:
+		wait(carIsFull);
+		# Waits the end of the ride:
+		wait(carUnload);
+		# This passenger has left the car
+	}
+	
+	procedure load() {
+		# Waits for the car if it is riding:
+		while (passengersInCar > 0) {
+			wait(carUnload);
+		}
+		carIsWaitingPassengers = 1;
+		# Notifies the passengers the car is ready to load them:
+		signal_all(carLoad);
+		# This car is waiting for passengers
+		# Waits until the car gets full:
+		wait(carIsFull);
+		carIsWaitingPassengers = 0;
+		# Notifies the passengers that the car is full:
+		signal_all(carIsFull);
+		# This car is full. Going around...
+	}
+	
+	procedure unload() {
+		# Unload the passengers:
+		signal_all(carUnload);
+		passengersInCar = 0;
+		# This car has unloaded its passengers
+	}
+}
+
+b)
+monitor RollerCoaster {
+
+	int CAR_CAPACITY; # Predefined
+	int NUM_CARS; # Predefined
+	int passengersInCar[NUM_CARS] = ([NUM_CARS] 0); # Array whose values are the number of passengers in the car[i]
+	int nextCarRequestLoad = 0; # Index of the next car that will request load
+	int nextCarToUnload = 0; # Index of the next car that will be unloaded
+	int nextCarToLoad = 0; # Index of the next car that will load
+	int nextCarToLoadIsWaitingPassengers = 0; # 1 if the next car that will load is waiting for passengers, 0 otherwise
+	
+	cond carLoad; # Signaled when a car can load passengers
+	cond carUnload; # Signaled when a car is unloading its passengers
+	cond carIsFull; # Signaled when a car is full
+	cond nextCarCanLoad; # Signaled when the next car to load can load passengers
+	
+	procedure takeRide() {
+		# Waits for an available car:
+		while (nextCarToLoadIsWaitingPassengers == 0 || passengersInCar[nextCarToLoad] == CAR_CAPACITY) {
+			# This passenger is waiting for a car
+			wait(carLoad);
+		}
+		
+		int ridingCar = nextCarToLoad;
+		passengersInCar[ridingCar]++;
+		# This passenger will take ride in a car
+		if (passengersInCar[ridingCar] == CAR_CAPACITY) {
+			# Notifies the car that it is full:
+			signal(carIsFull);
+		}		
+		# Waits until the car gets full:
+		wait(carIsFull);
+		# Waits the end of the ride:
+		wait(carUnload);
+		# This passenger has left the car
+	}
+	
+	procedure load() {
+		int thisCar = nextCarRequestLoad;
+		# Updates the index of the next car that will carry passengers:
+		nextCarRequestLoad = (nextCarRequestLoad + 1) % NUM_CARS;
+		# If this car is not the next car to go around then waits its successor car to leave:
+		if (thisCar != nextCarToLoad) {
+			wait(nextCarCanLoad);
+		}
+		nextCarToLoadIsWaitingPassengers = 1;
+		# Notifies the passengers the car is ready to load them:
+		signal_all(carLoad);
+		# This car is waiting for passengers
+		# Waits until the car gets full:
+		wait(carIsFull);
+		nextCarToLoadIsWaitingPassengers = 0;
+		# Notifies the passengers that the car is full:
+		signal_all(carIsFull);
+		# This car is full. Going around...
+		nextCarToLoad = (nextCarToLoad + 1) % NUM_CARS;
+		# Awakes up the next car, i.e. its predecessor: 
+		signal(nextCarCanLoad);
+	}
+	
+	procedure unload() {
+		# Unload the passengers:
+		for [i = 0 to CAR_CAPACITY] {
+			signal(carUnload);
+		}
+		passengersInCar[nextCarToUnload] = 0;
+		# This car has unloaded its passengers
+		nextCarToUnload = (nextCarToUnload + 1) % NUM_CARS;
+	}
+}

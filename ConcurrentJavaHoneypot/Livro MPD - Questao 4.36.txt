@@ -1,0 +1,28 @@
+Livro Multithreaded, Parallel, and Distributed Programming - Questão 4.36
+Solução:
+
+sem notFull;
+sem full;
+int honeypotPortions = 0;
+
+process Honeybee[i = 1 to N] {
+	while(true) {
+		P(notFull);
+		honeypotPortions++;
+		#Puts the honey in the honeypot
+		if (honeypotPortions == MAX_PORTIONS) {
+			V(full);
+		} else {
+			V(notFull);
+		}
+	}
+}
+
+process Bear {
+	while(true) {
+		P(full);
+		#Eats the honey of the honeypot
+		portionsHoneypot = 0;
+		V(notFull);
+	}
+}

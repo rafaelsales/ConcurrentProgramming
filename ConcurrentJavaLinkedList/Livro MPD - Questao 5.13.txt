@@ -1,0 +1,53 @@
+Livro Multithreaded, Parallel, and Distributed Programming - Questão 5.13
+
+Solução:
+Invariant: (nw <= 1 and nd <= 1 and nd == 1 => (nr == 0 and n == 0))
+	- nr: number of active readers
+	- nw: number of active writers
+	- nd: number of active deleters
+
+monitor LinkedList {
+
+	int numReaders = 0;
+	int numWriters = 0;
+	int numDeleters = 0;
+	cond canAccess; # Signaled when all readers, a writer or a deleter has accessed the list
+
+	procedure startRead() {
+		while (numDeleters == 1) {
+			wait(canAccess);
+		}
+		numReaders++;
+	}
+	
+	procedure endRead() {
+		numReaders--;
+		if (numReaders == 0) {
+			signal(canAccess);
+		}
+	}
+	
+	procedure startWrite() {
+		while (numWriters == 1 || numDeleteres == 1) {
+			wait(canAccess);
+		}
+		numWriters = 1;
+	}
+	
+	procedure endWrite() {
+		numWriters = 0;
+		signal(canAccess);
+	}
+	
+	procedure startDelete() {
+		while (numReaders > 0 || numWriters == 1 || numDeleters == 1) {
+			wait(canAccess);
+		}
+		numDeleteres = true;
+	}
+	
+	procedure endDelete() {
+		hasActiveDeleter = false;
+		signal_all(canAccess);
+	}
+}
